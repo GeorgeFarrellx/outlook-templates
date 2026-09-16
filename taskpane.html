@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quick Templates</title>
+  <link rel="stylesheet" href="taskpane.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="lz-string.min.js"></script>
+  <script src="taskpane.js" defer></script>
+</head>
+<body>
+  <div id="loading" class="loading">Loading templates…</div>
+
+  <div id="fatal" class="fatal" hidden></div>
+
+  <!-- ===================== LIST ===================== -->
+  <section id="view-list" class="view" hidden>
+    <header class="bar">
+      <input id="search" type="search" placeholder="Search templates" aria-label="Search templates" autocomplete="off">
+      <button id="btn-new" class="btn primary" title="New template">+ New</button>
+      <button id="btn-settings" class="btn icon" title="Settings and backup" aria-label="Settings and backup">⚙</button>
+    </header>
+    <div class="bar sub">
+      <select id="category-filter" aria-label="Category"></select>
+    </div>
+    <div id="restore-banner" class="banner" hidden></div>
+    <div id="template-list" class="list" role="list"></div>
+    <div id="empty-state" class="empty" hidden></div>
+    <p class="hint">Click a template to insert it where your cursor is in the email.</p>
+  </section>
+
+  <!-- ===================== FILL PLACEHOLDERS ===================== -->
+  <section id="view-fill" class="view" hidden>
+    <header class="bar">
+      <button class="btn link back" data-action="back">‹ Back</button>
+      <h2 id="fill-title" class="title"></h2>
+    </header>
+    <form id="fill-form" class="pad" autocomplete="off">
+      <div id="fill-fields"></div>
+      <p id="fill-warning" class="warning" hidden></p>
+      <div class="actions">
+        <button type="submit" id="btn-fill-insert" class="btn primary">Insert</button>
+        <button type="button" class="btn" data-action="back">Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ===================== EDITOR ===================== -->
+  <section id="view-edit" class="view" hidden>
+    <header class="bar">
+      <button class="btn link back" id="btn-edit-back">‹ Back</button>
+      <h2 id="edit-title" class="title">New template</h2>
+    </header>
+    <div class="pad">
+      <label class="field">Name
+        <input id="edit-name" type="text" maxlength="80" required>
+      </label>
+      <label class="field">Category
+        <input id="edit-category" type="text" maxlength="40" list="category-options" placeholder="e.g. VAT">
+        <datalist id="category-options"></datalist>
+      </label>
+      <label class="field">Subject <span class="muted">(optional)</span>
+        <input id="edit-subject" type="text" maxlength="200">
+      </label>
+
+      <div class="field">
+        <span>Email text</span>
+        <div class="toolbar" role="toolbar" aria-label="Formatting">
+          <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">••</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.</button>
+          <button type="button" data-cmd="createLink" title="Add link">🔗</button>
+          <button type="button" data-cmd="removeFormat" title="Clear formatting">⌫</button>
+        </div>
+        <div id="edit-body" class="editor" contenteditable="true" spellcheck="true" aria-label="Email text"></div>
+      </div>
+
+      <div class="field">
+        <span>Placeholders <span class="muted">(click to add at the cursor)</span></span>
+        <div id="placeholder-chips" class="chips"></div>
+        <div id="custom-placeholder" class="inline-form" hidden>
+          <input id="custom-placeholder-name" type="text" maxlength="40" placeholder="e.g. Tax Year">
+          <button type="button" id="btn-custom-placeholder-add" class="btn">Add</button>
+        </div>
+        <div id="link-form" class="inline-form" hidden>
+          <input id="link-url" type="url" placeholder="https://">
+          <button type="button" id="btn-link-add" class="btn">Add link</button>
+        </div>
+      </div>
+
+      <button type="button" id="btn-capture" class="btn full">Copy selected text from the email</button>
+
+      <p id="edit-error" class="error" hidden></p>
+      <div class="actions">
+        <button type="button" id="btn-save" class="btn primary">Save</button>
+        <button type="button" id="btn-edit-cancel" class="btn">Cancel</button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-delete" class="btn danger" hidden>Delete</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section id="view-settings" class="view" hidden>
+    <header class="bar">
+      <button class="btn link back" data-action="back">‹ Back</button>
+      <h2 class="title">Settings &amp; backup</h2>
+    </header>
+    <div class="pad">
+      <h3>Font for inserted text</h3>
+      <p class="muted small">Match this to your usual Outlook font, so templates don't stand out from what you type.</p>
+      <div class="row">
+        <label class="field grow">Font
+          <select id="set-font">
+            <option value="">Don't set a font</option>
+            <option>Aptos</option>
+            <option>Calibri</option>
+            <option>Arial</option>
+            <option>Segoe UI</option>
+            <option>Verdana</option>
+            <option>Tahoma</option>
+            <option>Times New Roman</option>
+          </select>
+        </label>
+        <label class="field">Size
+          <select id="set-size">
+            <option>9</option><option>10</option><option>10.5</option><option>11</option>
+            <option>12</option><option>14</option><option>16</option>
+          </select>
+        </label>
+      </div>
+      <button type="button" id="btn-settings-save" class="btn primary">Save settings</button>
+
+      <h3>Storage</h3>
+      <p class="muted small">Templates are saved in your Outlook mailbox, which gives add-ins about 32 KB. Text compresses well, but images can't be stored.</p>
+      <div class="meter"><div id="storage-bar" class="meter-fill"></div></div>
+      <p id="storage-text" class="small"></p>
+
+      <h3>Backup</h3>
+      <button type="button" id="btn-export" class="btn full">Show backup of all templates</button>
+      <div id="export-area" hidden>
+        <textarea id="export-text" rows="5" readonly></textarea>
+        <button type="button" id="btn-copy-export" class="btn">Copy to clipboard</button>
+        <p class="muted small">Paste the backup into Notepad and save it as a .json file.</p>
+      </div>
+
+      <h3>Import</h3>
+      <p class="muted small">Choose a backup file (.json), or paste its contents below.</p>
+      <input id="import-file" type="file" accept=".json,application/json">
+      <textarea id="import-text" rows="4" placeholder="…or paste backup text here"></textarea>
+      <div class="actions">
+        <button type="button" id="btn-import-add" class="btn primary">Add to my templates</button>
+        <button type="button" id="btn-import-replace" class="btn">Replace all</button>
+      </div>
+      <p id="import-message" class="small" hidden></p>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-action" class="btn link" hidden></button>
+  </div>
+</body>
+</html>
