@@ -18,7 +18,7 @@
   var COLLAPSED_KEY = 'qt.collapsed.v1';
   var STORAGE_LIMIT = 30000; // Outlook's hard limit is 32 KB; keep some headroom.
   var PLACEHOLDER_SOURCE = '\\{([A-Za-z0-9][A-Za-z0-9 _-]{0,40})\\}';
-  var DEFAULT_SETTINGS = { fontFamily: 'Aptos', fontSize: '12', replaceSubject: true };
+  var DEFAULT_SETTINGS = { fontFamily: 'Aptos', fontSize: '12', subjectMode: 'replace' };
   var COMMON_PLACEHOLDERS = ['FirstName', 'Amount', 'Today'];
 
   var state = {
@@ -143,8 +143,16 @@
 
   function loadFromMailbox() {
     var rs = Office.context.roamingSettings;
-    state.settings = Object.assign(clone(DEFAULT_SETTINGS), rs.get(SETTINGS_KEY) || {});
+    var saved = rs.get(SETTINGS_KEY) || {};
+    state.settings = Object.assign(clone(DEFAULT_SETTINGS), saved, { subjectMode: defaultSubjectMode(saved) });
+    delete state.settings.replaceSubject;
     state.templates = decodeTemplates(rs.get(STORE_KEY));
+  }
+
+  function defaultSubjectMode(settings) {
+    if (['replace', 'keep', 'append'].indexOf(settings.subjectMode) !== -1) return settings.subjectMode;
+    // Preserve the default chosen in older versions of the add-in.
+    return settings.replaceSubject === false ? 'keep' : 'replace';
   }
 
   /** Saves templates (and settings) to the mailbox. Resolves once Outlook confirms. */
@@ -609,10 +617,11 @@
       toast('Open an email you are writing first, then click a template.', { error: true });
       return;
     }
+    var mode = $('subject-mode').value;
     var names = findPlaceholders(template.subject, template.body);
-    if (!names.length) {
-      insertTemplate(template, {}, $('replace-subject').checked).then(function (ok) {
-        if (ok) resetSubjectToggle();
+    if (!findPlaceholders(mode === 'keep' ? '' : template.subject, template.body).length) {
+      insertTemplate(template, {}, mode).then(function (ok) {
+        if (ok) resetSubjectMode();
       });
       return;
     }
@@ -622,7 +631,7 @@
       var hasSubject = !!(template.subject || '').trim();
       $('fill-subject-row').hidden = !hasSubject;
       $('fill-subject-text').textContent = template.subject || '';
-      $('fill-replace-subject').checked = $('replace-subject').checked;
+      $('fill-subject-mode').value = mode;
       var fields = $('fill-fields');
       fields.innerHTML = '';
       names.forEach(function (name, i) {
@@ -640,13 +649,27 @@
           input
         ]));
       });
+      updateFillFields();
       $('fill-warning').hidden = true;
       $('btn-fill-insert').textContent = 'Insert';
       show('fill');
-      var inputs = Array.prototype.slice.call(fields.querySelectorAll('input'));
+      var inputs = Array.prototype.slice.call(fields.querySelectorAll('input')).filter(function (i) { return !i.parentNode.hidden; });
       var target = inputs.filter(function (i) { return !i.value; })[0] || inputs[0];
       if (target) target.focus();
     });
+  }
+
+  function updateFillFields() {
+    if (!state.filling) return;
+    var template = state.filling.template;
+    var names = findPlaceholders($('fill-subject-mode').value === 'keep' ? '' : template.subject, template.body);
+    $('fill-fields').querySelectorAll('input').forEach(function (input) {
+      input.parentNode.hidden = names.indexOf(input.getAttribute('data-name')) === -1;
+      input.parentNode.classList.remove('blank');
+    });
+    state.filling.confirmBlanks = false;
+    $('fill-warning').hidden = true;
+    $('btn-fill-insert').textContent = 'Insert';
   }
 
   function onFillSubmit(e) {
@@ -655,6 +678,7 @@
     var values = {};
     var blanks = [];
     $('fill-fields').querySelectorAll('input').forEach(function (input) {
+      if (input.parentNode.hidden) return;
       var name = input.getAttribute('data-name');
       values[name] = input.value;
       if (!input.value.trim()) { blanks.push(name); input.parentNode.classList.add('blank'); }
@@ -669,18 +693,18 @@
       return;
     }
     var template = state.filling.template;
-    var replace = $('fill-subject-row').hidden ? $('replace-subject').checked : $('fill-replace-subject').checked;
-    insertTemplate(template, values, replace).then(function (ok) {
-      if (ok) { state.filling = null; resetSubjectToggle(); show('list'); }
+    var mode = $('fill-subject-row').hidden ? $('subject-mode').value : $('fill-subject-mode').value;
+    insertTemplate(template, values, mode).then(function (ok) {
+      if (ok) { state.filling = null; resetSubjectMode(); show('list'); }
     });
   }
 
-  /** Puts the "Use the template's subject" tick box back to the default from Settings. */
-  function resetSubjectToggle() {
-    $('replace-subject').checked = state.settings.replaceSubject !== false;
+  /** Restores the default subject choice after insertion or a change of email. */
+  function resetSubjectMode() {
+    $('subject-mode').value = defaultSubjectMode(state.settings);
   }
 
-  function insertTemplate(template, values, replaceSubject) {
+  function insertTemplate(template, values, subjectMode) {
     var item = currentItem();
     if (!item) {
       toast('Open an email you are writing first, then click a template.', { error: true });
@@ -698,42 +722,37 @@
         });
       })
       .then(function () {
-        if (!subject || !item.subject || !item.subject.getAsync) {
-          toast('Inserted "' + template.name + '".');
+        if (subjectMode === 'keep') {
+          toast('Inserted "' + template.name + '". Subject left as it was.');
           return true;
         }
-        if (!replaceSubject) {
-          toast('Inserted "' + template.name + '". Subject left as it was.', {
-            actionLabel: 'Use template subject',
-            onAction: function () {
-              officeCall(function (cb) { item.subject.setAsync(subject, cb); })
-                .then(function () { toast('Subject updated.'); })
-                .catch(function (err) { toast('Couldn\'t change the subject: ' + err.message, { error: true }); });
-            }
-          });
+        if (!subject || !item.subject || !item.subject.getAsync || !item.subject.setAsync) {
+          toast('Inserted "' + template.name + '".');
           return true;
         }
         return officeCall(function (cb) { item.subject.getAsync(cb); }).then(function (previous) {
           previous = previous || '';
-          if (previous.trim() === subject) {
+          var next = subjectMode === 'append' && previous.trim() ? previous + ' - ' + subject : subject;
+          if (previous === next) {
             toast('Inserted "' + template.name + '".');
             return true;
           }
-          return officeCall(function (cb) { item.subject.setAsync(subject, cb); }).then(function () {
-            if (!previous.trim()) {
-              toast('Inserted "' + template.name + '" and set the subject.');
-            } else {
-              toast('Inserted "' + template.name + '" and replaced the subject.', {
-                actionLabel: 'Undo subject',
-                onAction: function () {
-                  officeCall(function (cb) { item.subject.setAsync(previous, cb); })
-                    .then(function () { toast('Subject put back.'); })
-                    .catch(function (err) { toast('Couldn\'t change the subject: ' + err.message, { error: true }); });
-                }
-              });
-            }
+          return officeCall(function (cb) { item.subject.setAsync(next, cb); }).then(function () {
+            var message = !previous.trim() ? 'set the subject.' : subjectMode === 'append' ? 'added to the subject.' : 'replaced the subject.';
+            toast('Inserted "' + template.name + '" and ' + message, {
+              actionLabel: 'Undo subject',
+              onAction: function () {
+                officeCall(function (cb) { item.subject.setAsync(previous, cb); })
+                  .then(function () { toast('Subject put back.'); })
+                  .catch(function (err) { toast('Couldn\'t change the subject: ' + err.message, { error: true }); });
+              }
+            });
             return true;
           });
+        }).catch(function (err) {
+          // The body is already inserted; don't invite a retry that would duplicate it.
+          toast('Template inserted, but couldn\'t change the subject: ' + err.message, { error: true });
+          return true;
         });
       })
       .catch(function (err) {
@@ -997,7 +1016,7 @@
     $('set-font').value = state.settings.fontFamily || '';
     $('set-size').value = String(state.settings.fontSize || '12');
     $('set-size').disabled = !state.settings.fontFamily;
-    $('set-replace-subject').checked = state.settings.replaceSubject !== false;
+    $('set-subject-mode').value = defaultSubjectMode(state.settings);
     $('export-area').hidden = true;
     $('import-message').hidden = true;
     $('import-text').value = '';
@@ -1022,11 +1041,11 @@
     var settings = Object.assign({}, state.settings, {
       fontFamily: $('set-font').value,
       fontSize: $('set-size').value,
-      replaceSubject: $('set-replace-subject').checked
+      subjectMode: $('set-subject-mode').value
     });
     persist(state.templates, settings).then(function () {
       renderStorage();
-      resetSubjectToggle();
+      resetSubjectMode();
       toast('Settings saved.');
     }).catch(function (err) { toast(err.message, { error: true }); });
   }
@@ -1186,6 +1205,7 @@
     });
 
     $('fill-form').addEventListener('submit', onFillSubmit);
+    $('fill-subject-mode').addEventListener('change', updateFillFields);
 
     $('btn-edit-back').addEventListener('click', onEditCancel);
     $('btn-edit-cancel').addEventListener('click', onEditCancel);
@@ -1254,7 +1274,7 @@
       state.templates = [];
     }
     $('loading').hidden = true;
-    resetSubjectToggle();
+    resetSubjectMode();
     show('list');
     renderList();
     if (loadError) {
@@ -1264,7 +1284,7 @@
 
     if (Office.context.mailbox && Office.context.mailbox.addHandlerAsync && Office.EventType && Office.EventType.ItemChanged) {
       Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
-        resetSubjectToggle();
+        resetSubjectMode();
         if (state.view === 'fill') { state.filling = null; show('list'); renderList(); }
         if (state.view === 'edit') { $('btn-capture').hidden = !currentItem(); }
       });
