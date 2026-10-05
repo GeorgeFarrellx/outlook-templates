@@ -120,18 +120,8 @@ textarea { resize: vertical; margin: 6px 0; font-size: 12px; font-family: Consol
 .error { color: var(--danger); font-size: 13px; }
 .warning { background: var(--warn-bg); color: var(--warn-text); padding: 6px 8px; border-radius: var(--radius); font-size: 13px; }
 
-/* ---------- tick boxes ---------- */
-.toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  line-height: 1.35;
-}
-.toggle input { margin: 2px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
-.bar-toggle { padding: 2px 12px 6px; }
-.fill-toggle { margin-top: 14px; }
+/* ---------- subject choices ---------- */
+.subject-choice { margin: 0; padding: 2px 12px 6px; }
 #fill-subject-text { font-weight: 600; }
 
 /* ---------- list ---------- */

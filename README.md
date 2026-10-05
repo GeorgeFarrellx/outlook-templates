@@ -35,6 +35,18 @@ These placeholders fill themselves in, and you can still change the value before
 
 If you leave a placeholder blank, the add-in asks you to confirm first. A blank `{FirstName}` in "Hi {FirstName}," gives "Hi,".
 
+## Subject when inserting
+
+Choose an option above the template list before clicking a template. You can also change it on the fill-in screen:
+
+- **Replace subject** uses the template's subject instead of the email's current subject.
+- **Keep current subject** leaves the subject unchanged, including on an email with no subject. Placeholders used only in the template's subject do not need filling in.
+- **Add to current subject** keeps the current subject and adds ` - ` followed by the filled-in template subject. For example, `RE: Accounts` becomes `RE: Accounts - Documents needed`. If the email has no subject, it uses the template subject without a separator.
+
+A template with no subject always leaves the current subject alone. **Undo subject** restores the previous subject after replacing or adding.
+
+Choose your usual option under **Settings → Subject line**. That default returns after each insertion and when you switch emails. Your previous replace/keep default carries over automatically.
+
 ## Limits
 
 - Outlook gives add-ins about 32 KB of mailbox storage. Templates are compressed, and the meter in Settings shows how much you've used.

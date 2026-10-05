@@ -5,10 +5,10 @@
   <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Quick Templates</title>
-  <link rel="stylesheet" href="taskpane.css?v=2">
+  <link rel="stylesheet" href="taskpane.css?v=3">
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="lz-string.min.js"></script>
-  <script src="taskpane.js?v=2" defer></script>
+  <script src="taskpane.js?v=3" defer></script>
 </head>
 <body>
   <div id="loading" class="loading">Loading templates…</div>
@@ -25,9 +25,13 @@
     <div class="bar sub">
       <select id="category-filter" aria-label="Category"></select>
     </div>
-    <label class="toggle bar-toggle" title="Untick to keep the email's current subject for the next template you insert">
-      <input type="checkbox" id="replace-subject" checked>
-      <span>Use the template's subject</span>
+    <label class="field subject-choice">
+      Subject when inserting
+      <select id="subject-mode">
+        <option value="replace">Replace subject</option>
+        <option value="keep">Keep current subject</option>
+        <option value="append">Add to current subject</option>
+      </select>
     </label>
     <div id="restore-banner" class="banner" hidden></div>
     <div id="template-list" class="list" role="list"></div>
@@ -43,10 +47,17 @@
     </header>
     <form id="fill-form" class="pad" autocomplete="off">
       <div id="fill-fields"></div>
-      <label class="toggle fill-toggle" id="fill-subject-row" hidden>
-        <input type="checkbox" id="fill-replace-subject" checked>
-        <span>Replace subject with “<span id="fill-subject-text"></span>”</span>
-      </label>
+      <div id="fill-subject-row" hidden>
+        <label class="field">
+          Subject when inserting
+          <select id="fill-subject-mode">
+            <option value="replace">Replace subject</option>
+            <option value="keep">Keep current subject</option>
+            <option value="append">Add to current subject</option>
+          </select>
+        </label>
+        <p class="muted small">Template subject: <span id="fill-subject-text"></span></p>
+      </div>
       <p id="fill-warning" class="warning" hidden></p>
       <div class="actions">
         <button type="submit" id="btn-fill-insert" class="btn primary">Insert</button>
@@ -142,11 +153,15 @@
         </label>
       </div>
       <h3>Subject line</h3>
-      <label class="toggle">
-        <input type="checkbox" id="set-replace-subject" checked>
-        <span>Tick "Use the template's subject" by default</span>
+      <label class="field">
+        Default when inserting
+        <select id="set-subject-mode">
+          <option value="replace">Replace subject</option>
+          <option value="keep">Keep current subject</option>
+          <option value="append">Add to current subject</option>
+        </select>
       </label>
-      <p class="muted small">When ticked, inserting a template replaces the email's subject. You can still untick it for a single email.</p>
+      <p class="muted small">Choose your usual option. You can change it before each insertion. Adding keeps the current subject and puts the template's subject after it, separated by " - ".</p>
       <button type="button" id="btn-settings-save" class="btn primary">Save settings</button>
 
       <h3>Storage</h3>
